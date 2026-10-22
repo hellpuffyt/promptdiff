@@ -27,7 +27,7 @@ from promptdiff.report import (
     render_run_json,
     render_run_table,
 )
-from promptdiff.runner import FixtureNotFoundError, ReplayRunner
+from promptdiff.runner import FixtureError, FixtureNotFoundError, ReplayRunner
 from promptdiff.suite import SuiteParseError, load_suite
 
 EXIT_OK = 0
@@ -131,7 +131,9 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_compare(args)
         parser.error(f"unknown command: {args.command}")
         return EXIT_USAGE_ERROR  # pragma: no cover - argparse.error exits
-    except (SuiteParseError, AssertionSpecError, FixtureNotFoundError) as exc:
+    except (
+        SuiteParseError, AssertionSpecError, FixtureNotFoundError, FixtureError
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE_ERROR
 

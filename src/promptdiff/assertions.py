@@ -106,6 +106,17 @@ class MatchesRegexAssertion:
     flags: str = ""
     type: ClassVar[str] = "matches_regex"
 
+    def __post_init__(self) -> None:
+        # Validate when the suite is loaded, not when the first fixture
+        # happens to be checked: a broken pattern used to surface only once
+        # a recorded output existed for that case.
+        try:
+            re.compile(self.pattern, self._re_flags())
+        except re.error as exc:
+            raise AssertionSpecError(
+                f"matches_regex: invalid pattern {self.pattern!r}: {exc}"
+            ) from exc
+
     def _re_flags(self) -> int:
         mapping = {"i": re.IGNORECASE, "m": re.MULTILINE, "s": re.DOTALL}
         result = 0
