@@ -116,7 +116,7 @@ promptdiff run \
 
 ```
 case            status  failed_assertions
---------------  ------  ------------------
+--------------  ------  -----------------
 greeting        FAIL    contains
 json-user       PASS
 classification  PASS
@@ -138,13 +138,13 @@ promptdiff compare \
 ```
 
 ```
-case            base -> head    verdict  assertion transitions
---------------  --------------  -------  ----------------------------------------
-greeting        FAIL -> PASS    CHANGED  improved: contains
-json-user       PASS -> FAIL    CHANGED  regressed: is_valid_json, json_has_keys, json_schema
-classification  PASS -> FAIL    CHANGED  regressed: one_of
-regex-date      PASS -> FAIL    CHANGED  regressed: matches_regex
-refusal         PASS -> PASS    same
+case            base -> head  verdict  assertion transitions
+--------------  ------------  -------  ----------------------------------------------------
+greeting        FAIL -> PASS  CHANGED  improved: contains
+json-user       PASS -> FAIL  CHANGED  regressed: is_valid_json, json_has_keys, json_schema
+classification  PASS -> FAIL  CHANGED  regressed: one_of
+regex-date      PASS -> FAIL  CHANGED  regressed: matches_regex
+refusal         PASS -> PASS  same
 
 suite: example-assistant-suite
 base=v1  head=v2
@@ -254,7 +254,7 @@ produces.
 ## Testing
 
 ```bash
-.venv/bin/python -m pytest                # macOS/Linux (153 tests)
+.venv/bin/python -m pytest                # macOS/Linux (156 tests)
 # .venv\Scripts\python.exe -m pytest     # Windows
 ruff check .
 mypy

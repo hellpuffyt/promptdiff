@@ -23,10 +23,10 @@ def _table(headers: list[str], rows: list[list[str]]) -> str:
             widths[i] = max(widths[i], len(cell))
     lines = []
     header_line = "  ".join(h.ljust(widths[i]) for i, h in enumerate(headers))
-    lines.append(header_line)
+    lines.append(header_line.rstrip())
     lines.append("  ".join("-" * w for w in widths))
     for row in rows:
-        lines.append("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)))
+        lines.append("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)).rstrip())
     return "\n".join(lines)
 
 
@@ -38,7 +38,7 @@ def render_run_table(results: tuple[CaseResult, ...]) -> str:
         rows.append([result.case_id, status, _wrap(failed, 40)])
     table = _table(["case", "status", "failed_assertions"], rows)
     rate = pass_rate(results)
-    summary = f"\n{sum(1 for r in results if r.passed)}/{len(results)} cases passed ({rate:.0%})"
+    summary = f"\n\n{sum(1 for r in results if r.passed)}/{len(results)} cases passed ({rate:.0%})"
     return table + summary
 
 
@@ -90,7 +90,9 @@ def render_compare_table(report: CompareReport, *, show_text_diff: bool = False)
                 case.case_id,
                 f"{base_status} -> {head_status}",
                 verdict,
-                _wrap("; ".join(flags), 50),
+                # Never truncated: this column is what a CI reader acts on, and a
+                # cut-off name hides which assertion regressed.
+                "; ".join(flags),
             ]
         )
     table = _table(["case", "base -> head", "verdict", "assertion transitions"], rows)

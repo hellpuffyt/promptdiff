@@ -146,3 +146,48 @@ class TestCompareRendering:
         )
         payload = json.loads(render_compare_json(report, show_text_diff=True))
         assert "text_diff" not in payload["cases"][0]
+
+
+class TestTableLayout:
+    def test_long_transition_list_is_not_truncated(self) -> None:
+        suite = parse_suite_text(
+            """
+cases:
+  - id: c1
+    input: "x"
+    assertions:
+      - type: is_valid_json
+      - type: json_has_keys
+        keys: ["name"]
+      - type: json_schema
+        schema: {"type": "object"}
+"""
+        )
+        report = compare_versions(
+            suite,
+            _DictRunner({"c1": '{"name": "a"}'}),
+            _DictRunner({"c1": "not json"}),
+            base_version="v1",
+            head_version="v2",
+        )
+        table = render_compare_table(report)
+        assert "regressed: is_valid_json, json_has_keys, json_schema" in table
+        assert "…" not in table
+
+    def test_tables_have_no_trailing_whitespace(self) -> None:
+        suite = parse_suite_text(SUITE_TEXT)
+        results = run_suite(suite, _DictRunner({"c1": "ok"}))
+        report = compare_versions(
+            suite,
+            _DictRunner({"c1": "ok"}),
+            _DictRunner({"c1": "ok"}),
+            base_version="v1",
+            head_version="v2",
+        )
+        for text in (render_run_table(results), render_compare_table(report)):
+            assert all(line == line.rstrip() for line in text.splitlines())
+
+    def test_run_summary_is_separated_by_a_blank_line(self) -> None:
+        suite = parse_suite_text(SUITE_TEXT)
+        table = render_run_table(run_suite(suite, _DictRunner({"c1": "ok"})))
+        assert table.splitlines()[-2:] == ["", "1/1 cases passed (100%)"]
