@@ -22,6 +22,12 @@ class FixtureNotFoundError(FileNotFoundError):
     """Raised by ReplayRunner when no recorded output exists for a case."""
 
 
+class FixtureError(ValueError):
+    """Raised by ReplayRunner for a fixture it refuses or fails to read: a
+    case id / version that would resolve outside the fixtures directory, or
+    a fixture that is not valid UTF-8."""
+
+
 @runtime_checkable
 class Runner(Protocol):
     """Anything that can produce an output for a given case is a Runner.
@@ -56,6 +62,21 @@ class ReplayRunner:
         self._version_dir = self.fixtures_dir / version
 
     def _fixture_path(self, case_id: str) -> Path:
+        # Case ids and versions come from the suite file and the command
+        # line; neither may steer the read outside the fixtures directory
+        # (e.g. an id of "../../secrets"), since outputs are echoed in
+        # reports and --text-diff.
+        root = self.fixtures_dir.resolve()
+        version_dir = (root / self.version).resolve()
+        if version_dir == root or not version_dir.is_relative_to(root):
+            raise FixtureError(
+                f"version {self.version!r} would read outside the fixtures directory"
+            )
+        target = (version_dir / case_id).resolve()
+        if target == version_dir or not target.is_relative_to(version_dir):
+            raise FixtureError(
+                f"case id {case_id!r} would read outside the fixtures directory"
+            )
         for ext in _FIXTURE_EXTENSIONS:
             candidate = self._version_dir / f"{case_id}{ext}"
             if candidate.is_file():
@@ -72,7 +93,13 @@ class ReplayRunner:
                 f"(looked for {self._version_dir / (case_id + '.txt')} and "
                 f"{self._version_dir / (case_id + '.json')})"
             )
-        return path.read_text(encoding="utf-8")
+        try:
+            return path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            raise FixtureError(
+                f"fixture for case {case_id!r} at version {self.version!r} is not valid "
+                f"UTF-8 (byte offset {exc.start})"
+            ) from None
 
     def has_fixture(self, case_id: str) -> bool:
         return self._fixture_path(case_id).is_file()

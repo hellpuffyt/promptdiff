@@ -26,6 +26,9 @@ cases:
 
 
 class _DictRunner:
+    """DETERMINISTIC FAKE runner for tests: returns canned outputs from a
+    dict. No model, no network -- it stands in for a live provider."""
+
     def __init__(self, outputs: dict[str, str]) -> None:
         self.outputs = outputs
 

@@ -94,12 +94,14 @@ Requires Python 3.10+.
 git clone https://github.com/hellpuffyt/promptdiff.git
 cd promptdiff
 python -m venv .venv
-./.venv/Scripts/python.exe -m pip install -e ".[dev]"   # Windows
-# or: .venv/bin/python -m pip install -e ".[dev]"        # macOS/Linux
+.venv/bin/python -m pip install -e ".[dev]"              # macOS/Linux
+# or: .venv\Scripts\python.exe -m pip install -e ".[dev]"  # Windows
 ```
 
 This installs the `promptdiff` console script inside the virtual
-environment.
+environment (activate it, or call `.venv/bin/promptdiff`). promptdiff is
+not published on PyPI; the PyPI name `promptdiff` belongs to an unrelated
+project, so `pip install promptdiff` installs something else.
 
 ## Usage
 
@@ -252,8 +254,8 @@ produces.
 ## Testing
 
 ```bash
-./.venv/Scripts/python.exe -m pytest       # Windows
-./.venv/bin/python -m pytest                # macOS/Linux
+.venv/bin/python -m pytest                # macOS/Linux (153 tests)
+# .venv\Scripts\python.exe -m pytest     # Windows
 ruff check .
 mypy
 ```
@@ -262,8 +264,10 @@ The test suite covers every assertion type in both directions (fires and
 correctly does not fire), suite parsing errors, `ReplayRunner` including
 the missing-fixture error path, and the version-comparison logic
 (regressions, improvements, unchanged cases, pass-rate math). It runs
-entirely offline -- there is no network access anywhere in the test
-path.
+entirely offline: runners in the tests are `ReplayRunner` over recorded
+fixtures or small deterministic fakes labelled as such, and an autouse
+fixture in `tests/conftest.py` fails any test that opens a network
+connection -- so no test can make a real model call.
 
 ## Security
 
@@ -274,8 +278,15 @@ path.
 - `json_schema` validation uses the `jsonschema` library's validator
   against Draft 2020-12; schemas are only used for validation, never
   executed.
+- `ReplayRunner` refuses case ids and versions that would resolve outside
+  the fixtures directory (`../`, absolute paths, symlinks pointing out),
+  so a suite file cannot make promptdiff read and report arbitrary files.
+- `matches_regex` patterns run in Python's `re` engine; a pathological
+  pattern in a suite can be slow. Treat suite files as code you review.
 - No secrets, API keys, or credentials are read, stored, or required by
-  any code path in this repository.
+  any code path in this repository. Report security issues privately via
+  [GitHub security advisories](https://github.com/hellpuffyt/promptdiff/security/advisories/new)
+  (see [SECURITY.md](SECURITY.md)).
 
 ## License
 

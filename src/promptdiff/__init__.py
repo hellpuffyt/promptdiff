@@ -12,7 +12,7 @@ from promptdiff.assertions import (
 )
 from promptdiff.compare import CaseComparison, CompareReport, compare_versions
 from promptdiff.evaluate import CaseResult, pass_rate, run_suite
-from promptdiff.runner import FixtureNotFoundError, ReplayRunner, Runner
+from promptdiff.runner import FixtureError, FixtureNotFoundError, ReplayRunner, Runner
 from promptdiff.suite import Case, Suite, SuiteParseError, load_suite
 
 __version__ = "0.1.0"
@@ -27,6 +27,7 @@ __all__ = [
     "CaseResult",
     "pass_rate",
     "run_suite",
+    "FixtureError",
     "FixtureNotFoundError",
     "ReplayRunner",
     "Runner",
