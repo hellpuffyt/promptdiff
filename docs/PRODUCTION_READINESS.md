@@ -69,8 +69,8 @@ contained to the fixtures directory; suite regexes run in Python `re`
 ## Known limitations
 
 Assertions are lexical/structural only (no semantic judgement, by design);
-symlinked fixture directories pointing outside the fixtures root are
-refused.
+symlinked fixture directories and symlinked fixture files pointing outside
+the fixtures root are refused.
 
 ## Acceptance checklist
 

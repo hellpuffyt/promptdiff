@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ReplayRunner` followed `../` and absolute paths in case ids and versions,
   so a suite could read files outside the fixtures directory into reports.
+- `ReplayRunner` followed a fixture file that was itself a symlink to a file
+  outside the fixtures directory; it now resolves the real path and refuses
+  it (exit code 2).
+- `--text-diff` printed the base and head lines joined on one line
+  (`-old+new`) when a fixture had no trailing newline; each diff line is now
+  on its own line.
 - An invalid `matches_regex` pattern or flag was only detected when a
   fixture for that case existed, not when the suite loaded (as documented).
 - A non-UTF-8 fixture crashed with a traceback; it is now exit code 2.

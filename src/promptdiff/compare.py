@@ -93,7 +93,9 @@ class CaseComparison:
             fromfile="base",
             tofile="head",
         )
-        return "".join(diff)
+        # An output without a trailing newline yields a last line without
+        # one; terminate every diff line so "-old" and "+new" never merge.
+        return "".join(line if line.endswith("\n") else line + "\n" for line in diff)
 
 
 @dataclass(frozen=True)
