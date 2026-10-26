@@ -2,9 +2,21 @@
 
 A regression harness for prompt changes. Run a fixed evaluation suite
 across two prompt versions and get a report of the **behavioural** delta
-between them -- which cases changed verdict, which assertions newly
-fail, and the aggregate pass-rate change -- instead of just a text diff
-of raw outputs.
+between them (which cases changed verdict, which assertions newly fail,
+and the aggregate pass-rate change) instead of just a text diff of raw
+outputs.
+
+**Status:** version 0.1.0, not on PyPI. The CLI replays recorded outputs
+only; calling a live model means writing a small runner (example below).
+CI runs the tests on Linux, macOS and Windows with Python 3.10 to 3.13.
+
+## Demo
+
+<img src="docs/screenshots/compare-v1-v2.png" width="100%" alt="Terminal capture: promptdiff run on the example suite at v1 shows 4 of 5 cases passing; promptdiff compare v1 against v2 shows greeting improved and json-user, classification and regex-date regressed, pass rate 80% to 40%, 3 regressions and 1 improvement, and the command exits 1.">
+
+*Real terminal capture of the bundled example: `run` on the v1 recordings,
+then `compare` v1 against v2, which exits `1` because three cases regressed.
+The same output is reproduced as text under [Usage](#usage).*
 
 ## What
 
@@ -23,7 +35,7 @@ JSON output on 8% of inputs, or the assistant stopped refusing a class
 of request it used to refuse. A text diff of the prompt tells you
 nothing about that. promptdiff runs the same fixed suite through both
 versions and reports the assertions that actually changed pass/fail
-status -- the thing you actually care about.
+status, which is the thing you care about.
 
 ## What this tool does not do
 
@@ -33,7 +45,7 @@ similarity scoring, and it never claims two outputs are "the same
 meaning." Every assertion it ships is a deterministic, model-free check:
 substring/regex matching, JSON validity and structure, length, and
 membership in an allowed set. If a prompt's wording changes completely
-but every assertion still passes, promptdiff reports "unchanged" --
+but every assertion still passes, promptdiff reports "unchanged",
 correctly, because that is all it can know. If you need semantic
 grading, layer an LLM-judge assertion on top by writing your own
 `Runner` and assertion; promptdiff's job is the deterministic floor
@@ -49,12 +61,12 @@ under that, not a replacement for it.
 - **Pluggable runner interface**: promptdiff never calls a model. A
   `Runner` is anything with a `run(case_id, input_text) -> str` method.
 - **`ReplayRunner` shipped out of the box**: reads pre-recorded outputs
-  from a fixtures directory, so the whole tool -- including its own test
-  suite -- runs fully offline, with zero API keys and zero network
+  from a fixtures directory, so the whole tool, including its own test
+  suite, runs fully offline, with zero API keys and zero network
   access.
 - **Behavioural comparison**: `promptdiff compare` runs a suite through
   two versions and reports, per case and per assertion, whether it
-  regressed, improved, or stayed the same -- plus the aggregate pass-rate
+  regressed, improved, or stayed the same, plus the aggregate pass-rate
   delta.
 - **Optional text diff**: `--text-diff` includes a unified diff of raw
   outputs for human inspection. It is never used to decide pass/fail.
@@ -69,7 +81,7 @@ src/promptdiff/
   assertions.py   model-free assertion types + suite-level parsing of them
   suite.py        suite file parsing/validation (YAML or JSON) -> Suite/Case
   runner.py       Runner protocol + ReplayRunner (fixture-backed, offline)
-  evaluate.py      run a Suite through one Runner -> CaseResult per case
+  evaluate.py     run a Suite through one Runner -> CaseResult per case
   compare.py      run a Suite through two Runners, pair up results,
                    compute per-assertion transitions and pass-rate deltas
   report.py       render run/compare results as a table or JSON
@@ -152,15 +164,20 @@ pass rate: 80% -> 40% (-40%)
 regressions: 3   improvements: 1
 ```
 
-Exit code is `1` because regressions were found (regardless of the
-pass-rate delta's sign -- one regressed case is enough). Pass
+Exit code is `1` because regressions were found. The pass-rate delta's
+sign doesn't matter; one regressed case is enough. Pass
 `--allow-regression` to acknowledge the regressions and exit `0` anyway
 (useful when you are intentionally trading one behaviour for another and
 want CI to still record the report).
 
 Add `--format json` to either subcommand for machine-readable output, and
 `--text-diff` to `compare` to include a unified diff of the raw outputs
-for cases whose text changed.
+for cases whose text changed. (Known issue: when a fixture has no trailing
+newline, as the bundled ones don't, the unified diff prints the base and
+head lines run together on one line, e.g. `-positive+Positive.`.)
+
+Errors in the suite file or a missing or unreadable fixture print
+`error: ...` to stderr and exit `2`.
 
 ### Plugging in a real provider
 
@@ -170,8 +187,8 @@ small adapter with the same `run` method and call the library directly
 instead of going through `ReplayRunner`:
 
 ```python
-from promptdiff import Suite, load_suite, run_suite, compare_versions
-from your_provider_sdk import Client
+from promptdiff import ReplayRunner, compare_versions, load_suite, run_suite
+from your_provider_sdk import Client   # placeholder for your model SDK
 
 class LiveRunner:
     def __init__(self, client: Client, system_prompt: str) -> None:
@@ -185,14 +202,16 @@ class LiveRunner:
         )
         return response.text
 
+client = Client()                      # however your SDK is configured
+prompt_v2_text = "You are a helpful assistant."
+
 suite = load_suite("examples/suite.yaml")
 results = run_suite(suite, LiveRunner(client, prompt_v2_text))
 
 # Or compare a live version against a recorded baseline:
-from promptdiff import ReplayRunner
 report = compare_versions(
     suite,
-    ReplayRunner("fixtures", "v1"),
+    ReplayRunner("examples/fixtures", "v1"),
     LiveRunner(client, prompt_v2_text),
     base_version="v1",
     head_version="live",
@@ -200,12 +219,13 @@ report = compare_versions(
 ```
 
 Any object with a `run(case_id: str, input_text: str) -> str` method
-satisfies the `Runner` protocol -- there is nothing to subclass.
+satisfies the `Runner` protocol; there is nothing to subclass.
 
 To record a fixture for `ReplayRunner`, run your provider once per case
 and save the raw output text to
 `<fixtures_dir>/<version>/<case_id>.txt` (or `.json` for JSON-producing
-cases -- both are read identically as plain text).
+cases; both are read identically as plain text, and `.txt` wins if both
+exist).
 
 ## Suite format
 
@@ -245,11 +265,11 @@ field; the CLI prints it to stderr and exits `2`.
 
 ## Examples
 
-`examples/suite.yaml` is a complete, runnable suite covering every
-assertion type, with two fixture sets under `examples/fixtures/` (`v1`
-and `v2`) that intentionally demonstrate a mix of regressions and one
-improvement -- see the Usage section above for the exact output it
-produces.
+`examples/suite.yaml` is a complete, runnable suite of five cases that
+uses eight of the nine assertion types (all except `starts_with`), with two
+fixture sets under `examples/fixtures/` (`v1` and `v2`) that demonstrate a
+mix of regressions and one improvement. The Usage section above shows the
+exact output it produces.
 
 ## Testing
 
@@ -267,7 +287,11 @@ the missing-fixture error path, and the version-comparison logic
 entirely offline: runners in the tests are `ReplayRunner` over recorded
 fixtures or small deterministic fakes labelled as such, and an autouse
 fixture in `tests/conftest.py` fails any test that opens a network
-connection -- so no test can make a real model call.
+connection, so no test can make a real model call.
+
+CI runs `pytest` on Ubuntu, macOS and Windows for Python 3.10 to 3.13,
+`ruff` and `mypy` on Linux, and a smoke job that installs the package and
+runs the example suite through the CLI.
 
 ## Security
 
@@ -279,14 +303,21 @@ connection -- so no test can make a real model call.
   against Draft 2020-12; schemas are only used for validation, never
   executed.
 - `ReplayRunner` refuses case ids and versions that would resolve outside
-  the fixtures directory (`../`, absolute paths, symlinks pointing out),
-  so a suite file cannot make promptdiff read and report arbitrary files.
+  the fixtures directory (`../`, absolute paths, or a version directory
+  that is a symlink pointing out). It does not check the fixture file
+  itself: a `<case_id>.txt` that is a symlink to a file elsewhere is
+  followed and its contents appear in reports. Don't run untrusted fixture
+  directories.
 - `matches_regex` patterns run in Python's `re` engine; a pathological
   pattern in a suite can be slow. Treat suite files as code you review.
 - No secrets, API keys, or credentials are read, stored, or required by
   any code path in this repository. Report security issues privately via
   [GitHub security advisories](https://github.com/hellpuffyt/promptdiff/security/advisories/new)
   (see [SECURITY.md](SECURITY.md)).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
