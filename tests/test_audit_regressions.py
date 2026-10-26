@@ -84,3 +84,60 @@ def test_non_utf8_fixture_is_a_clean_error(
 def test_network_guard_is_active() -> None:
     with pytest.raises(AssertionError, match="no real LLM calls"):
         socket.create_connection(("example.com", 443))
+
+
+def _symlink_or_skip(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target)
+    except (OSError, NotImplementedError):  # e.g. Windows without symlink rights
+        pytest.skip("symlinks are not available on this platform")
+
+
+def test_fixture_file_symlinked_outside_the_fixtures_directory_is_refused(
+    layout: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Before: fixtures/v1/leak.txt -> <tmp>/outside.txt was followed and
+    # "not a fixture" appeared in the report.
+    _symlink_or_skip(layout / "fixtures" / "v1" / "leak.txt", layout / "outside.txt")
+    runner = ReplayRunner(layout / "fixtures", "v1")
+    with pytest.raises(FixtureError, match="outside the fixtures directory"):
+        runner.run("leak", "x")
+    suite = layout / "suite.yaml"
+    suite.write_text(
+        "cases:\n  - id: leak\n    input: hi\n"
+        "    assertions:\n      - {type: contains, value: x}\n",
+        encoding="utf-8",
+    )
+    rc = main(["run", "--suite", str(suite), "--fixtures", str(layout / "fixtures"),
+               "--version", "v1", "--format", "json"])
+    captured = capsys.readouterr()
+    assert rc == 2
+    assert "not a fixture" not in captured.out + captured.err
+
+
+def test_fixture_file_symlinked_inside_the_fixtures_directory_still_reads(
+    layout: Path,
+) -> None:
+    v1 = layout / "fixtures" / "v1"
+    _symlink_or_skip(v1 / "alias.txt", v1 / "ok.txt")
+    assert ReplayRunner(layout / "fixtures", "v1").run("alias", "x") == "hello"
+
+
+def test_text_diff_puts_each_line_on_its_own_line_without_trailing_newline(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Before: fixtures with no trailing newline printed "-old+new" on one line.
+    for version, text in (("v1", "old"), ("v2", "new")):
+        (tmp_path / "fixtures" / version).mkdir(parents=True)
+        (tmp_path / "fixtures" / version / "c.txt").write_text(text, encoding="utf-8")
+    suite = tmp_path / "suite.yaml"
+    suite.write_text(
+        "cases:\n  - id: c\n    input: hi\n    assertions:\n      - {type: contains, value: e}\n",
+        encoding="utf-8",
+    )
+    main(["compare", "--suite", str(suite), "--fixtures", str(tmp_path / "fixtures"),
+          "--base", "v1", "--head", "v2", "--text-diff"])
+    lines = capsys.readouterr().out.splitlines()
+    assert "-old" in lines
+    assert "+new" in lines
+    assert "-old+new" not in "\n".join(lines)

@@ -24,8 +24,8 @@ class FixtureNotFoundError(FileNotFoundError):
 
 class FixtureError(ValueError):
     """Raised by ReplayRunner for a fixture it refuses or fails to read: a
-    case id / version that would resolve outside the fixtures directory, or
-    a fixture that is not valid UTF-8."""
+    case id / version or a symlinked fixture file that would resolve outside
+    the fixtures directory, or a fixture that is not valid UTF-8."""
 
 
 @runtime_checkable
@@ -80,6 +80,13 @@ class ReplayRunner:
         for ext in _FIXTURE_EXTENSIONS:
             candidate = self._version_dir / f"{case_id}{ext}"
             if candidate.is_file():
+                # The fixture file itself may be a symlink; refuse one whose
+                # real path lies outside the fixtures directory.
+                if not candidate.resolve().is_relative_to(root):
+                    raise FixtureError(
+                        f"fixture for case {case_id!r} at version {self.version!r} is a "
+                        "symlink that would read outside the fixtures directory"
+                    )
                 return candidate
         # No fixture found under any known extension; report the primary
         # expected path in the error for a clear, actionable message.

@@ -172,9 +172,9 @@ want CI to still record the report).
 
 Add `--format json` to either subcommand for machine-readable output, and
 `--text-diff` to `compare` to include a unified diff of the raw outputs
-for cases whose text changed. (Known issue: when a fixture has no trailing
-newline, as the bundled ones don't, the unified diff prints the base and
-head lines run together on one line, e.g. `-positive+Positive.`.)
+for cases whose text changed. Every diff line is printed on its own line,
+including when a fixture has no trailing newline (as the bundled ones
+don't), e.g. `-positive` followed by `+Positive.`.
 
 Errors in the suite file or a missing or unreadable fixture print
 `error: ...` to stderr and exit `2`.
@@ -302,12 +302,13 @@ runs the example suite through the CLI.
 - `json_schema` validation uses the `jsonschema` library's validator
   against Draft 2020-12; schemas are only used for validation, never
   executed.
-- `ReplayRunner` refuses case ids and versions that would resolve outside
-  the fixtures directory (`../`, absolute paths, or a version directory
-  that is a symlink pointing out). It does not check the fixture file
-  itself: a `<case_id>.txt` that is a symlink to a file elsewhere is
-  followed and its contents appear in reports. Don't run untrusted fixture
-  directories.
+- `ReplayRunner` resolves real paths and refuses anything outside the
+  fixtures directory: case ids and versions with `../` or absolute paths,
+  a version directory that is a symlink pointing out, and a fixture file
+  (`<case_id>.txt` / `.json`) that is itself a symlink to a file outside
+  the fixtures directory. Each is reported as `error: ...` with exit `2`,
+  and the outside file is never read. Symlinks that stay inside the
+  fixtures directory are followed.
 - `matches_regex` patterns run in Python's `re` engine; a pathological
   pattern in a suite can be slow. Treat suite files as code you review.
 - No secrets, API keys, or credentials are read, stored, or required by
